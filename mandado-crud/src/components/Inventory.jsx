@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { useEffect, useState } from 'react';
+import '../App.css';
 
 const API = 'http://localhost:8000';
 
@@ -10,10 +10,13 @@ export default function Inventory() {
     const [editingId, setEditingId] = useState(null);
 
     const fetchItems = async () => {
-        const res = await axios.get(`${API}/items`);
-        setItems(res.data);
-        console.log(items.length);
-
+        try {
+            const response = await fetch(`${API}/items`);
+            const data = await response.json();
+            setItems(data);
+        } catch (error) {
+            console.error('Error fetching items:', error);
+        }
     };
 
     const validate = () => {
@@ -31,17 +34,31 @@ export default function Inventory() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setErrors({});
         if (!validate()) return;
 
-        if (editingId) {
-            await axios.put(`${API}/items/${editingId}`, form);
-        } else {
-            await axios.post(`${API}/items`, form);
+        const method = editingId ? 'PUT' : 'POST';
+        const url = editingId ? `${API}/items/${editingId}` : `${API}/items`;
+
+        const requestOptions = {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(form),
+        };
+
+        try {
+            const response = await fetch(url, requestOptions);
+
+            if (response.ok) {
+                setForm({ name: '', quantity: '', price: '' });
+                setEditingId(null);
+                fetchItems();
+            } else {
+                console.error('Failed to save item.');
+            }
+        } catch (error) {
+            console.error('Error saving item:', error);
         }
-        setForm({ name: '', quantity: '', price: '' });
-        setEditingId(null);
-        setErrors({});
-        fetchItems();
     };
 
     const handleEdit = (item) => {
@@ -50,11 +67,19 @@ export default function Inventory() {
     };
 
     const handleDelete = async (id) => {
-        const confirmDelete = window.confirm("Are you sure you want to delete this item?");
+        const confirmDelete = window.confirm('Are you sure you want to delete this item?');
         if (!confirmDelete) return;
 
-        await axios.delete(`${API}/items/${id}`);
-        fetchItems();
+        try {
+            const response = await fetch(`${API}/items/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                fetchItems();
+            } else {
+                console.error('Failed to delete item.');
+            }
+        } catch (error) {
+            console.error('Error deleting item:', error);
+        }
     };
 
     useEffect(() => {
@@ -63,7 +88,7 @@ export default function Inventory() {
 
     return (
         <div className="max-w-xl mx-auto mt-10 p-6 bg-white shadow rounded">
-            <h2 className="text-2xl font-bold mb-4 text-center">📦 Inventory System</h2>
+            <h2 className="text-2xl font-bold mb-4 text-center">Inventory System</h2>
 
             <form onSubmit={handleSubmit} className="grid sm:grid-cols-4 gap-4 mb-8">
                 <div>
@@ -106,13 +131,10 @@ export default function Inventory() {
             </form>
 
             <ul className="space-y-4">
-                {items.length > 0 ? items.map((item) => (
-                    <li
-                        key={item.id}
-                        className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border shadow-sm"
-                    >
+                {items?.length > 0 ? items.map((item) => (
+                    <li key={item.id} className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border shadow-sm">
                         <div>
-                            <p className="font-medium text-lg">{item.name}</p>
+                            <p className="font-medium text-lg text-left">{item.name}</p>
                             <p className="text-sm text-gray-500">
                                 {item.quantity} pcs • ₱{item.price}
                             </p>
@@ -133,9 +155,7 @@ export default function Inventory() {
                         </div>
                     </li>
                 )) : (
-                    <>
-                        <h1>No records found.</h1>
-                    </>
+                    <p className="text-gray-500">No items in the inventory.</p>
                 )}
             </ul>
         </div>
